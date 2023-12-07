@@ -1,0 +1,91 @@
+clc;
+clear;
+%参数设置
+%6个子系统的威布尔分布的参数
+alpha=[2.3, 3, 2.8, 3.1, 2, 2.4];
+beta=[600, 500, 600, 630, 500, 660];
+%每个阶段持续的时间
+taus=[10, 20];
+num_stage=2;
+t=linspace(0, sum(taus), 100);
+%加速失效因子自己取
+%按理说每个子系统每个阶段的加速失效因子各不相同，但是文章没给出，就按每个子系统的加速失效因子相同，只在不同的阶段不同来算
+acce_factors=[1, 1.5];
+%每阶段需要最少的UAV数量
+ks=[5, 4];
+
+%要分别计算每个子系统的累计失效函数，因为每个子系统参与的阶段不一样
+%没参与某一阶段的话，该阶段的加速失效因子就是0
+%第一个子系统
+Fj=zeros(num_stage, length(t));
+sum_c=0;
+%假设每个子系统每个阶段都参与
+%i表示第i个子系统
+%j表示第j个阶段
+for i=1:1:6
+    sum_c=0;
+    for j=1:1:2
+     sum_c=sum_c+acce_factors(j).*taus(j);
+     Fj(j,i)=1-exp(-(sum_c./beta(i)).^alpha(i));
+     Qj(j,i)=Fj(j,i);
+     Pj(j,i)=1- Qj(j,i);
+    end
+end
+
+sum_p(1)=1;
+Q(1,1)=1;
+%m阶段的可靠性
+for m=1:1:2
+    for i=1:1:6
+        if i==1
+            Q(m,i)=(1-Qj(m,i));
+        else
+            Q(m,i)=Q(m,i-1)*(1-Qj(m,i));
+        end
+    end
+    Pm(m)=Q(m,i);
+    Qm(m)=1-Pm(m);
+    if m==1
+        qm(m)=Qm(m);
+    else
+        %失效概率
+        qm(m)=Qm(m)-Qm(m-1);
+    end
+        %可靠性
+        pm(m)=1-qm(m);
+end
+
+%计算初始值为从35架开始的可靠性
+%n=37;
+for n=5:30
+for j=1:1:2
+    P=0;
+    for k=ks(j):n
+            P=P+nchoosek(n,k)*(1-qm(j))^k*((0.985*qm(j))^(n-k));
+    end
+    if j==1
+        Pr(j)=P;
+    else
+        Pr(j)=Pr(j-1)*P;
+    end
+end
+Pn(n)=Pr(j);
+if n==5;
+    I(n)=Pn(n);
+else
+    I(n)=(Pn(n)-Pn(n-1))/Pn(n-1);
+end
+t1(n)=n;
+y(n)=0;
+end
+
+
+subplot(1,1,1)
+%plot(t1,I, 'or-', t1,y, 'b');
+plot(t1,I, 'or-');
+xlim([5 30]); %X轴的数据显示范围；
+%ylim([0.55 1.1]); %X轴的数据显示范围；
+legend( 'Imperfect fault coverage');
+xlabel('The number of UAVs');
+%ylabel('Importance measure');
+ylabel('Swarm reliability');
